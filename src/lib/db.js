@@ -9,6 +9,24 @@ db.version(1).stores({
   settings: 'key, value'
 });
 
+// Request persistent storage to prevent data loss
+if (navigator.storage && navigator.storage.persist) {
+  navigator.storage.persist().then((persistent) => {
+    if (persistent) {
+      console.log('Storage will persist and won\'t be cleared without user action');
+    } else {
+      console.log('Storage may be cleared by the browser under storage pressure');
+    }
+  });
+}
+
+// Check if storage is already persistent
+if (navigator.storage && navigator.storage.persisted) {
+  navigator.storage.persisted().then((isPersisted) => {
+    console.log(`Storage persistence status: ${isPersisted}`);
+  });
+}
+
 // Lead operations
 export const leadsDB = {
   async getAll() {
