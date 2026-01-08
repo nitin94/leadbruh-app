@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { autoSavePhoto } from '../lib/photoSaver';
 
 function CameraOverlay({ onCapture, onClose, setVideoRef, captureImage }) {
   const [isReady, setIsReady] = useState(false);
@@ -18,15 +19,25 @@ function CameraOverlay({ onCapture, onClose, setVideoRef, captureImage }) {
 
   const handleCapture = async () => {
     if (isCapturing) return;
-    
+
     setIsCapturing(true);
-    
+
     try {
       const imageBlob = await captureImage();
-      
+
       // Haptic feedback
       if (navigator.vibrate) navigator.vibrate(50);
-      
+
+      // Save photo to device gallery (non-blocking)
+      autoSavePhoto(imageBlob, `business-card-${Date.now()}.jpg`, true)
+        .then(result => {
+          console.log('Photo saved:', result.method);
+        })
+        .catch(err => {
+          console.error('Failed to save photo:', err);
+          // Don't block the flow if save fails
+        });
+
       onCapture(imageBlob);
     } catch (error) {
       console.error('Capture error:', error);
