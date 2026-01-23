@@ -1,31 +1,47 @@
 import React from 'react';
 
-function CaptureTab({ 
-  count, 
-  lastCapture, 
-  isProcessing, 
-  showUndo, 
-  onUndo, 
-  onVoiceStart, 
-  onCameraOpen, 
-  onTextOpen 
+function CaptureTab({
+  count,
+  lastCapture,
+  isProcessing,
+  showUndo,
+  onUndo,
+  onVoiceStart,
+  onCameraOpen,
+  onTextOpen,
+  pendingLeadName,
+  onCancelAppend,
+  onAddMoreDetails
 }) {
   const isEmpty = count === 0 && !isProcessing && !lastCapture;
 
   return (
     <div className="capture-tab">
+      {pendingLeadName && (
+        <div className="append-mode-banner">
+          <div className="append-mode-text">
+            <span className="append-mode-label">Adding to:</span>
+            <span className="append-mode-lead">{pendingLeadName}</span>
+          </div>
+          <button className="append-mode-cancel" onClick={onCancelAppend}>
+            Cancel
+          </button>
+        </div>
+      )}
+
       {isEmpty ? (
         <EmptyState />
       ) : (
         <div className="lead-counter">
           <div className="counter-number">{count}</div>
           <div className="counter-label">leads</div>
-          
+
           <ConfirmationCard
             lead={lastCapture}
             isProcessing={isProcessing}
             showUndo={showUndo}
             onUndo={onUndo}
+            onAddMoreDetails={onAddMoreDetails}
           />
         </div>
       )}
@@ -78,7 +94,7 @@ function EmptyState() {
   );
 }
 
-function ConfirmationCard({ lead, isProcessing, showUndo, onUndo }) {
+function ConfirmationCard({ lead, isProcessing, showUndo, onUndo, onAddMoreDetails }) {
   if (isProcessing) {
     return (
       <div className="confirmation-card processing">
@@ -100,9 +116,20 @@ function ConfirmationCard({ lead, isProcessing, showUndo, onUndo }) {
         {lead.company && <div className="confirmation-subtitle">{lead.company}</div>}
         {lead.email && <div className="confirmation-detail">{lead.email}</div>}
         {showUndo && (
-          <button className="undo-button" onClick={onUndo}>
-            Undo
-          </button>
+          <div className="confirmation-actions">
+            <button
+              className="add-more-details-button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddMoreDetails(lead);
+              }}
+            >
+              Add more details
+            </button>
+            <button className="undo-button" onClick={onUndo}>
+              Undo
+            </button>
+          </div>
         )}
       </div>
     </div>

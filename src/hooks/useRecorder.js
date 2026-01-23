@@ -78,12 +78,15 @@ export function useRecorder() {
 
   const stopRecording = useCallback(() => {
     return new Promise((resolve, reject) => {
-      if (!mediaRecorder.current || mediaRecorder.current.state === 'inactive') {
+      const recorder = mediaRecorder.current;
+
+      if (!recorder) {
         reject(new Error('No recording in progress'));
         return;
       }
 
-      mediaRecorder.current.onstop = () => {
+      // Set up the stop handler
+      recorder.onstop = () => {
         // Stop all tracks
         if (streamRef.current) {
           streamRef.current.getTracks().forEach(track => track.stop());
@@ -91,8 +94,8 @@ export function useRecorder() {
         }
 
         // Create blob from chunks
-        const audioBlob = new Blob(audioChunks.current, { 
-          type: mediaRecorder.current.mimeType 
+        const audioBlob = new Blob(audioChunks.current, {
+          type: recorder.mimeType
         });
 
         // Clear timer
@@ -105,12 +108,19 @@ export function useRecorder() {
         resolve(audioBlob);
       };
 
-      mediaRecorder.current.onerror = (event) => {
+      recorder.onerror = (event) => {
         setIsRecording(false);
         reject(new Error('Recording error: ' + event.error?.message));
       };
 
-      mediaRecorder.current.stop();
+      // Stop the recording (will trigger onstop above)
+      try {
+        recorder.stop();
+      } catch (error) {
+        // Only happens if already stopped or in wrong state
+        setIsRecording(false);
+        reject(new Error('No recording in progress'));
+      }
     });
   }, []);
 

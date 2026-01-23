@@ -5,6 +5,7 @@ import { useCamera } from './hooks/useCamera';
 import { offlineQueue } from './lib/offlineQueue';
 import api from './lib/api';
 import { exportToCSV, exportToExcel } from './lib/export';
+import { mergeLead } from './lib/utils';
 import './App.css';
 
 // Components
@@ -14,6 +15,7 @@ import RecordingOverlay from './components/RecordingOverlay';
 import CameraOverlay from './components/CameraOverlay';
 import TextInputOverlay from './components/TextInputOverlay';
 import ExportModal from './components/ExportModal';
+import EditLeadModal from './components/EditLeadModal';
 import Toast from './components/Toast';
 
 function App() {
@@ -24,7 +26,13 @@ function App() {
   const [showTextInput, setShowTextInput] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
-  
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingLead, setEditingLead] = useState(null);
+
+  // Append mode state (for multi-modal input)
+  const [pendingLeadId, setPendingLeadId] = useState(null);
+  const [pendingLeadName, setPendingLeadName] = useState('');
+
   // Processing state
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastCapture, setLastCapture] = useState(null);
@@ -38,7 +46,7 @@ function App() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   
   // Hooks
-  const { leads, addLead, deleteLead, count, refresh } = useLeads();
+  const { leads, addLead, updateLead, deleteLead, count, refresh } = useLeads();
   const recorder = useRecorder();
   const camera = useCamera();
 
@@ -81,8 +89,28 @@ function App() {
 
       // Process voice capture
       const { lead } = await api.processVoice(audioBlob);
-      const savedLead = await addLead(lead);
-      
+
+      let savedLead;
+      if (pendingLeadId) {
+        // Append mode: merge with existing lead
+        const existingLead = leads.find(l => l.id === pendingLeadId);
+        if (existingLead) {
+          const merged = mergeLead(existingLead, lead);
+          await updateLead(pendingLeadId, merged);
+          savedLead = { ...existingLead, ...merged };
+          showToast(`Updated ${pendingLeadName}`, 'success');
+          // Exit append mode
+          setPendingLeadId(null);
+          setPendingLeadName('');
+        } else {
+          // Lead not found, create new
+          savedLead = await addLead(lead);
+        }
+      } else {
+        // Normal mode: create new lead
+        savedLead = await addLead(lead);
+      }
+
       setLastCapture(savedLead);
       setShowUndo(true);
       
@@ -100,7 +128,7 @@ function App() {
     } finally {
       setIsProcessing(false);
     }
-  }, [recorder, isOnline, addLead, showToast, undoTimer]);
+  }, [recorder, isOnline, addLead, updateLead, leads, pendingLeadId, pendingLeadName, showToast, undoTimer]);
 
   // Handle camera capture
   const handleCameraCapture = useCallback(async (imageBlob) => {
@@ -119,8 +147,28 @@ function App() {
       }
 
       const { lead } = await api.processCard(imageBlob);
-      const savedLead = await addLead(lead);
-      
+
+      let savedLead;
+      if (pendingLeadId) {
+        // Append mode: merge with existing lead
+        const existingLead = leads.find(l => l.id === pendingLeadId);
+        if (existingLead) {
+          const merged = mergeLead(existingLead, lead);
+          await updateLead(pendingLeadId, merged);
+          savedLead = { ...existingLead, ...merged };
+          showToast(`Updated ${pendingLeadName}`, 'success');
+          // Exit append mode
+          setPendingLeadId(null);
+          setPendingLeadName('');
+        } else {
+          // Lead not found, create new
+          savedLead = await addLead(lead);
+        }
+      } else {
+        // Normal mode: create new lead
+        savedLead = await addLead(lead);
+      }
+
       setLastCapture(savedLead);
       setShowUndo(true);
       
@@ -136,7 +184,7 @@ function App() {
     } finally {
       setIsProcessing(false);
     }
-  }, [isOnline, addLead, showToast, undoTimer]);
+  }, [isOnline, addLead, updateLead, leads, pendingLeadId, pendingLeadName, showToast, undoTimer]);
 
   // Handle text capture
   const handleTextCapture = useCallback(async (text) => {
@@ -154,8 +202,28 @@ function App() {
       }
 
       const { lead } = await api.processText(text);
-      const savedLead = await addLead(lead);
-      
+
+      let savedLead;
+      if (pendingLeadId) {
+        // Append mode: merge with existing lead
+        const existingLead = leads.find(l => l.id === pendingLeadId);
+        if (existingLead) {
+          const merged = mergeLead(existingLead, lead);
+          await updateLead(pendingLeadId, merged);
+          savedLead = { ...existingLead, ...merged };
+          showToast(`Updated ${pendingLeadName}`, 'success');
+          // Exit append mode
+          setPendingLeadId(null);
+          setPendingLeadName('');
+        } else {
+          // Lead not found, create new
+          savedLead = await addLead(lead);
+        }
+      } else {
+        // Normal mode: create new lead
+        savedLead = await addLead(lead);
+      }
+
       setLastCapture(savedLead);
       setShowUndo(true);
       
@@ -171,7 +239,7 @@ function App() {
     } finally {
       setIsProcessing(false);
     }
-  }, [isOnline, addLead, showToast, undoTimer]);
+  }, [isOnline, addLead, updateLead, leads, pendingLeadId, pendingLeadName, showToast, undoTimer]);
 
   // Handle undo
   const handleUndo = useCallback(async () => {
@@ -204,6 +272,68 @@ function App() {
       showToast('Export failed', 'error');
     }
   }, [leads, showToast]);
+
+  // Handle edit lead
+  const handleEditLead = useCallback((lead) => {
+    setEditingLead(lead);
+    setShowEditModal(true);
+  }, []);
+
+  // Handle save edited lead
+  const handleSaveEdit = useCallback(async (updates) => {
+    if (!editingLead) return;
+
+    try {
+      await updateLead(editingLead.id, {
+        ...updates,
+        updatedAt: new Date().toISOString()
+      });
+      setShowEditModal(false);
+      setEditingLead(null);
+      showToast('Lead updated', 'success');
+    } catch (error) {
+      console.error('Update error:', error);
+      showToast('Failed to update lead', 'error');
+    }
+  }, [editingLead, updateLead, showToast]);
+
+  // Handle start append mode
+  const handleStartAppendMode = useCallback((lead) => {
+    setPendingLeadId(lead.id);
+    setPendingLeadName(lead.name || 'Unknown');
+    setActiveTab('capture');
+    showToast(`Adding details to ${lead.name || 'lead'}`, 'info');
+  }, [showToast]);
+
+  // Handle cancel append mode
+  const handleCancelAppendMode = useCallback(() => {
+    setPendingLeadId(null);
+    setPendingLeadName('');
+    showToast('Cancelled', 'info');
+  }, [showToast]);
+
+  // Handle delete lead
+  const handleDeleteLead = useCallback(async (lead) => {
+    const confirmed = window.confirm(
+      `Delete ${lead.name || 'this lead'}?\n\nThis action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await deleteLead(lead.id);
+      showToast('Lead deleted', 'success');
+
+      // If we were in append mode for this lead, exit append mode
+      if (pendingLeadId === lead.id) {
+        setPendingLeadId(null);
+        setPendingLeadName('');
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      showToast('Failed to delete lead', 'error');
+    }
+  }, [deleteLead, pendingLeadId, showToast]);
 
   // Open camera
   const handleOpenCamera = useCallback(async () => {
@@ -242,11 +372,17 @@ function App() {
             onVoiceStart={recorder.startRecording}
             onCameraOpen={handleOpenCamera}
             onTextOpen={() => setShowTextInput(true)}
+            pendingLeadName={pendingLeadName}
+            onCancelAppend={handleCancelAppendMode}
+            onAddMoreDetails={handleStartAppendMode}
           />
         ) : (
           <LeadsTab
             leads={leads}
             onSwitchToCapture={() => setActiveTab('capture')}
+            onEdit={handleEditLead}
+            onStartAppend={handleStartAppendMode}
+            onDelete={handleDeleteLead}
           />
         )}
       </main>
@@ -303,6 +439,17 @@ function App() {
           count={count}
           onExport={handleExport}
           onClose={() => setShowExport(false)}
+        />
+      )}
+
+      {showEditModal && editingLead && (
+        <EditLeadModal
+          lead={editingLead}
+          onSave={handleSaveEdit}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditingLead(null);
+          }}
         />
       )}
 
