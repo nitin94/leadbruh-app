@@ -4,6 +4,7 @@
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://ciqheaowpesxsytocarh.supabase.co';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const FUNCTIONS_URL = `${SUPABASE_URL}/functions/v1`;
+const API_TIMEOUT = 30000; // 30 second timeout for API calls
 
 class APIError extends Error {
   constructor(message, status, code) {
@@ -11,6 +12,27 @@ class APIError extends Error {
     this.name = 'APIError';
     this.status = status;
     this.code = code;
+  }
+}
+
+// Helper to add timeout to fetch requests
+async function fetchWithTimeout(url, options = {}, timeout = API_TIMEOUT) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new APIError('Request timeout. Please check your connection and try again.', 408, 'TIMEOUT');
+    }
+    throw error;
   }
 }
 
@@ -79,7 +101,7 @@ export const api = {
   async transcribe(audioBlob) {
     const base64Audio = await blobToBase64(audioBlob);
 
-    const response = await fetch(`${FUNCTIONS_URL}/transcribe`, {
+    const response = await fetchWithTimeout(`${FUNCTIONS_URL}/transcribe`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -105,7 +127,7 @@ export const api = {
     const compressedBlob = await compressImage(imageBlob);
     const base64Image = await blobToBase64(compressedBlob);
 
-    const response = await fetch(`${FUNCTIONS_URL}/extract-card`, {
+    const response = await fetchWithTimeout(`${FUNCTIONS_URL}/extract-card`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -126,7 +148,7 @@ export const api = {
    * @returns {Promise<{name, company, email, phone, notes}>}
    */
   async extractLead(text) {
-    const response = await fetch(`${FUNCTIONS_URL}/extract-lead`, {
+    const response = await fetchWithTimeout(`${FUNCTIONS_URL}/extract-lead`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

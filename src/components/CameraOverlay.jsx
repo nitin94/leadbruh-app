@@ -38,7 +38,11 @@ function CameraOverlay({ onCapture, onClose, setVideoRef, captureImage }) {
           // Don't block the flow if save fails
         });
 
+      // Pass to parent for processing
       onCapture(imageBlob);
+
+      // Reset capturing state after triggering parent callback
+      setIsCapturing(false);
     } catch (error) {
       console.error('Capture error:', error);
       setIsCapturing(false);

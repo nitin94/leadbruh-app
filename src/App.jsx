@@ -93,7 +93,9 @@ function App() {
       let savedLead;
       if (pendingLeadId) {
         // Append mode: merge with existing lead
-        const existingLead = leads.find(l => l.id === pendingLeadId);
+        await refresh();
+        const freshLeads = await refresh();
+        const existingLead = freshLeads?.find(l => l.id === pendingLeadId);
         if (existingLead) {
           const merged = mergeLead(existingLead, lead);
           await updateLead(pendingLeadId, merged);
@@ -113,28 +115,28 @@ function App() {
 
       setLastCapture(savedLead);
       setShowUndo(true);
-      
+
       // Clear undo after 10 seconds
       if (undoTimer) clearTimeout(undoTimer);
       const timer = setTimeout(() => setShowUndo(false), 10000);
       setUndoTimer(timer);
-      
+
       // Haptic feedback
       if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
-      
+
     } catch (error) {
       console.error('Voice processing error:', error);
       showToast(error.message || 'Failed to process voice note', 'error');
     } finally {
       setIsProcessing(false);
     }
-  }, [recorder, isOnline, addLead, updateLead, leads, pendingLeadId, pendingLeadName, showToast, undoTimer]);
+  }, [recorder, isOnline, addLead, updateLead, refresh, pendingLeadId, pendingLeadName, showToast, undoTimer]);
 
   // Handle camera capture
   const handleCameraCapture = useCallback(async (imageBlob) => {
     setShowCamera(false);
     setIsProcessing(true);
-    
+
     // Haptic feedback
     if (navigator.vibrate) navigator.vibrate(50);
 
@@ -151,7 +153,10 @@ function App() {
       let savedLead;
       if (pendingLeadId) {
         // Append mode: merge with existing lead
-        const existingLead = leads.find(l => l.id === pendingLeadId);
+        // Get fresh lead data from database instead of using stale leads array
+        await refresh();
+        const freshLeads = await refresh();
+        const existingLead = freshLeads?.find(l => l.id === pendingLeadId);
         if (existingLead) {
           const merged = mergeLead(existingLead, lead);
           await updateLead(pendingLeadId, merged);
@@ -171,20 +176,20 @@ function App() {
 
       setLastCapture(savedLead);
       setShowUndo(true);
-      
+
       if (undoTimer) clearTimeout(undoTimer);
       const timer = setTimeout(() => setShowUndo(false), 10000);
       setUndoTimer(timer);
-      
+
       if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
-      
+
     } catch (error) {
       console.error('Card processing error:', error);
       showToast(error.message || 'Failed to process card', 'error');
     } finally {
       setIsProcessing(false);
     }
-  }, [isOnline, addLead, updateLead, leads, pendingLeadId, pendingLeadName, showToast, undoTimer]);
+  }, [isOnline, addLead, updateLead, refresh, pendingLeadId, pendingLeadName, showToast, undoTimer]);
 
   // Handle text capture
   const handleTextCapture = useCallback(async (text) => {
@@ -206,7 +211,9 @@ function App() {
       let savedLead;
       if (pendingLeadId) {
         // Append mode: merge with existing lead
-        const existingLead = leads.find(l => l.id === pendingLeadId);
+        await refresh();
+        const freshLeads = await refresh();
+        const existingLead = freshLeads?.find(l => l.id === pendingLeadId);
         if (existingLead) {
           const merged = mergeLead(existingLead, lead);
           await updateLead(pendingLeadId, merged);
@@ -226,20 +233,20 @@ function App() {
 
       setLastCapture(savedLead);
       setShowUndo(true);
-      
+
       if (undoTimer) clearTimeout(undoTimer);
       const timer = setTimeout(() => setShowUndo(false), 10000);
       setUndoTimer(timer);
-      
+
       if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
-      
+
     } catch (error) {
       console.error('Text processing error:', error);
       showToast(error.message || 'Failed to process note', 'error');
     } finally {
       setIsProcessing(false);
     }
-  }, [isOnline, addLead, updateLead, leads, pendingLeadId, pendingLeadName, showToast, undoTimer]);
+  }, [isOnline, addLead, updateLead, refresh, pendingLeadId, pendingLeadName, showToast, undoTimer]);
 
   // Handle undo
   const handleUndo = useCallback(async () => {
@@ -421,6 +428,8 @@ function App() {
           onClose={() => {
             camera.closeCamera();
             setShowCamera(false);
+            // Reset processing state if user closes camera during processing
+            setIsProcessing(false);
           }}
           setVideoRef={camera.setVideoRef}
           captureImage={camera.captureImage}
