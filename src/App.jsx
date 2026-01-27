@@ -93,7 +93,6 @@ function App() {
       let savedLead;
       if (pendingLeadId) {
         // Append mode: merge with existing lead
-        await refresh();
         const freshLeads = await refresh();
         const existingLead = freshLeads?.find(l => l.id === pendingLeadId);
         if (existingLead) {
@@ -211,7 +210,6 @@ function App() {
       let savedLead;
       if (pendingLeadId) {
         // Append mode: merge with existing lead
-        await refresh();
         const freshLeads = await refresh();
         const existingLead = freshLeads?.find(l => l.id === pendingLeadId);
         if (existingLead) {

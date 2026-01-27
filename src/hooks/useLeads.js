@@ -18,9 +18,11 @@ export function useLeads() {
     try {
       const data = await leadsDB.getAll();
       setLeads(data);
+      return data;  // Return the fresh data
     } catch (err) {
       console.error('Failed to load leads:', err);
       setError('Failed to load leads');
+      return [];  // Return empty array on error
     } finally {
       setIsLoading(false);
     }
